@@ -1,0 +1,186 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Language {
+  TYPESCRIPT
+  JAVASCRIPT
+  PYTHON
+  JAVA
+  GO
+  CSHARP
+  PHP
+  RUBY
+  RUST
+  KOTLIN
+}
+
+enum Framework {
+  // TypeScript
+  NEXTJS
+  NESTJS
+  FASTIFY
+  EXPRESS
+  HONO
+
+  // JavaScript
+  REACT
+  VUE
+  ANGULAR
+  EXPRESS_JS
+  KOA
+  SVELTE
+  ADONISJS
+
+  // Python
+  DJANGO
+  FASTAPI
+  FLASK
+  LITESTAR
+
+  // Java
+  SPRING_BOOT
+  QUARKUS
+  MICRONAUT
+
+  // Go
+  GIN
+  FIBER
+  ECHO
+  CHI
+
+  // C#
+  ASP_NET_CORE
+
+  // PHP
+  LARAVEL
+  SYMFONY
+
+  // Ruby
+  RAILS
+  SINATRA
+
+  // Rust
+  ACTIX_WEB
+  AXUM
+
+  // Kotlin
+  KTOR
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  PAUSED
+}
+
+model User {
+  id            String  @default(uuid()) @id
+
+  name          String
+  email         String  @unique
+  password      String
+  avatar        String?
+
+  projects      Project[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Project {
+  id            String        @default(uuid()) @id
+
+  name          String
+  description   String
+  status        ProjectStatus? @default(PLANNING)
+  level         Level
+  framework     Framework
+  language      Language
+  RoadmapSteps  RoadmapStep[]
+
+  userId        String        
+  user          User          @relation(fields: [userId], references: [id])
+
+  notes         Note[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model RoadmapStep {
+  id                     String   @id @default(uuid())
+
+  step                   Int
+  title                  String
+  description            String   @db.Text
+
+  technologies           Json
+  libraries              Json
+  designPatterns         Json
+  architectureConcepts   Json
+
+  folderStructure        Json
+
+  filesToCreate          Json
+
+  implementationGuide    Json
+
+  bestPractices          Json
+
+  commonMistakes         Json
+
+  studyTopics            Json
+
+  estimatedTime          String
+
+  completionCriteria     Json
+
+  nextStep               String
+
+  completed              Boolean  @default(false)
+
+  projectId              String
+  project                Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  notes                  Note[]
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([step])
+}
+
+model Note {
+  id            String   @id @default(uuid())
+  content       String   @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  stepId        String?
+  step          RoadmapStep? @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([stepId])
+}
