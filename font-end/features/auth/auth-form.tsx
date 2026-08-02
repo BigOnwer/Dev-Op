@@ -22,7 +22,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setError("");
     if (isRegister && name.trim().length < 2) return setError("Informe seu nome.");
     if (!email.includes("@")) return setError("Informe um e-mail válido.");
-    if (password.length < 6) return setError("A senha precisa ter pelo menos 6 caracteres.");
+    if (password.length < 8) return setError("A senha precisa ter pelo menos 8 caracteres.");
     setPending(true);
     try {
       if (isRegister) {
@@ -58,5 +58,6 @@ export function AuthForm({ mode }: { mode: Mode }) {
 }
 
 function Field({ label, value, onChange, type = "text", placeholder, autoComplete }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder: string; autoComplete: string }) {
-  return <label className="block text-sm font-medium text-zinc-300"><span className="mb-2 block">{label}</span><input required type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoComplete={autoComplete} className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" /></label>;
+  const isPassword = type === "password";
+  return <label className="block text-sm font-medium text-zinc-300"><span className="mb-2 block">{label}</span><input required type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoComplete={autoComplete} minLength={isPassword ? 8 : undefined} maxLength={isPassword ? 128 : type === "email" ? 254 : 100} className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" /></label>;
 }

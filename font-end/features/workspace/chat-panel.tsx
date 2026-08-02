@@ -20,6 +20,10 @@ export function ChatPanel({ projectId, step, onClose }: { projectId: string; ste
     event.preventDefault();
     const message = draft.trim();
     if (!message || pending) return;
+    if (message.length > 4_000) {
+      setError("A pergunta pode ter no máximo 4.000 caracteres.");
+      return;
+    }
 
     setDraft("");
     setError("");
