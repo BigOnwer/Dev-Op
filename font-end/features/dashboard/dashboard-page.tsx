@@ -17,7 +17,7 @@ export function DashboardPage() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState("");
 
-  useEffect(() => { Promise.all([api.getUser(), api.getProjects()]).then(([profile, items]) => { setUser(profile); setProjects(items); }).catch((caught) => { if (caught instanceof ApiError && [401, 403, 500].includes(caught.status)) router.replace("/login"); else setError("Não foi possível carregar seus projetos."); }); }, [router]);
+  useEffect(() => { Promise.all([api.getUser(), api.getProjects()]).then(([profile, items]) => { setUser(profile); setProjects(items); }).catch((caught) => { if (caught instanceof ApiError && caught.status === 401) router.replace("/login"); else setError(caught instanceof ApiError ? caught.message : "Não foi possível carregar seus projetos."); }); }, [router]);
 
   const inProgress = projects?.filter((project) => project.status === "IN_PROGRESS").length ?? 0;
   const completed = projects?.filter((project) => project.status === "COMPLETED").length ?? 0;

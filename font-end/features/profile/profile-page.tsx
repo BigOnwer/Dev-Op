@@ -28,7 +28,7 @@ export function ProfilePage() {
       setName(profile.name);
       if (profile.avatar?.startsWith("http")) setAvatarPreview(profile.avatar);
     }).catch((caught) => {
-      if (caught instanceof ApiError && [401, 403].includes(caught.status)) router.replace("/login");
+      if (caught instanceof ApiError && caught.status === 401) router.replace("/login");
       else setError(caught instanceof ApiError ? caught.message : "Não foi possível carregar seu perfil.");
     });
   }, [router]);
@@ -55,9 +55,9 @@ export function ProfilePage() {
 
     setSavingAvatar(true);
     try {
-      const imagePatch = await readAsDataUrl(file);
-      setAvatarPreview(imagePatch);
-      mergeUser(await api.uploadAvatar(imagePatch));
+      const updatedUser = await api.uploadAvatar(file);
+      mergeUser(updatedUser);
+      setAvatarPreview(updatedUser.avatar?.startsWith("http") ? updatedUser.avatar : "");
       setSuccess("Avatar atualizado com sucesso.");
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Não foi possível enviar o avatar.");
@@ -91,5 +91,3 @@ export function ProfilePage() {
 
 function PasswordField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { const isCurrentPassword = label === "Senha atual"; return <label className="mt-5 block text-sm font-medium text-zinc-300"><span className="mb-2 block">{label}</span><input type="password" required minLength={8} maxLength={128} autoComplete={isCurrentPassword ? "current-password" : "new-password"} value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-3 text-sm outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10" /></label>; }
 function ProfileSkeleton() { return <main className="min-h-screen bg-zinc-950 p-5 sm:p-8"><div className="mx-auto max-w-5xl"><div className="h-9 w-32 animate-pulse rounded bg-zinc-800" /><div className="mt-10 grid gap-6 lg:grid-cols-2">{[1, 2].map((item) => <div key={item} className="h-96 animate-pulse rounded-3xl border border-zinc-800 bg-zinc-900/50" />)}</div></div></main>; }
-
-function readAsDataUrl(file: File): Promise<string> { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Não foi possível ler a imagem.")); reader.onerror = () => reject(reader.error); reader.readAsDataURL(file); }); }

@@ -1,77 +1,73 @@
-import type { FastifyReply, FastifyRequest } from "fastify"
+import type { FastifyReply, FastifyRequest } from "fastify";
+import { updateNameSchema, updatePasswordSchema } from "../schema/profile.schema.js";
 import type { ProfileService } from "../services/profileService.js";
 import type { UpdatePassword, UserInterface } from "../types/user.js";
+
 class ProfileController {
-    constructor(private profileService: ProfileService) {}
+  constructor(private profileService: ProfileService) {}
 
-    async getUser(request: FastifyRequest, reply: FastifyReply) {
-        try {
-            const userId = request.user?.sub
-            const user = await this.profileService.getUser(userId)
-            return reply.status(200).send(user)
-        } catch (error) {
-            console.error("Error in getUser:", error)
-            return reply.status(500).send({ error: "Internal Server Error" })
-        }
+  async getUser(request: FastifyRequest, reply: FastifyReply) {
+    const user = await this.profileService.getUser(request.user.sub);
+    return reply.status(200).send(user);
+  }
+
+  async updateUser(request: FastifyRequest<{ Body: UserInterface }>, reply: FastifyReply) {
+    const result = updateNameSchema.safeParse({
+      userId: request.user.sub,
+      name: request.body.name,
+    });
+
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "Dados de perfil inválidos." });
     }
 
-    async updateUser(request: FastifyRequest<{Body: UserInterface}>, reply: FastifyReply) {
-        try{
-            const {name} = request.body
-            const userId = request.user.sub
-            if(!userId) {
-                return reply.status(400).send({error: "Você deve estar logado"})
-            }
-            if(!name){
-                return reply.status(400).send({error: "All fields are required"})
-            }
+    const user = await this.profileService.updateUser(result.data.userId, result.data.name);
+    return reply.status(200).send(user);
+  }
 
-            const updateUser = await this.profileService.updateUser(userId, name)
-            return reply.status(200).send(updateUser)
-        } catch (error){
-            console.log("error in Update User", error)
-            return reply.status(500).send({error: "Internal Server Rrror"})
-        }
+  async uploadAvatar(request: FastifyRequest, reply: FastifyReply) {
+    const upload = await request.file();
+
+    if (!upload) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "Envie uma imagem." });
     }
 
-    async uploadAvatar(request: FastifyRequest<{Body: {imagePatch: string}}>, reply: FastifyReply) {
-        try{
-            const {imagePatch} = request.body
-            const userId = request.user.sub
-            if(!userId) {
-                return reply.status(400).send({error: "Você deve estar logado"})
-            }
-            if(!imagePatch){
-                return reply.status(400).send({error: "All fields are required"})
-            }
-
-            const uploadAvatar = await this.profileService.uploadAvatar(userId, imagePatch)
-            
-            return reply.status(200).send(uploadAvatar)
-        } catch (error){
-            console.log("error in Upload Avatar", error)
-            return reply.status(500).send({error: "Internal Server Rrror"})
-        }
+    const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (!allowedMimeTypes.has(upload.mimetype)) {
+      return reply.status(400).send({
+        error: "VALIDATION_ERROR",
+        message: "Envie uma imagem PNG, JPG ou WEBP.",
+      });
     }
 
-    async updatePassword(request: FastifyRequest<{Body: UpdatePassword}>, reply: FastifyReply) {
-        try{
-            const {lastPassword, newPassword} = request.body
-            const userId = request.user.sub
-            if(!userId) {
-                return reply.status(400).send({error: "Você deve estar logado"})
-            }
-            if(!lastPassword || !newPassword){
-                return reply.status(400).send({error: "All fields are required"})
-            }
-
-            const updatePassword = await this.profileService.updatePassword(userId, lastPassword, newPassword)
-            return reply.status(200).send(updatePassword)
-        } catch (error){
-            console.log("error in Update Password", error)
-            return reply.status(500).send({error: "Internal Server Rrror"})
-        }
+    const buffer = await upload.toBuffer();
+    if (upload.file.truncated) {
+      return reply.status(413).send({ error: "FILE_TOO_LARGE", message: "A imagem excede o limite de 5 MB." });
     }
+
+    const user = await this.profileService.uploadAvatar(request.user.sub, buffer, upload.mimetype);
+    return reply.status(200).send(user);
+  }
+
+  async updatePassword(request: FastifyRequest<{ Body: UpdatePassword }>, reply: FastifyReply) {
+    const result = updatePasswordSchema.safeParse({
+      userId: request.user.sub,
+      lastPassword: request.body.lastPassword,
+      newPassword: request.body.newPassword,
+    });
+
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "Dados de senha inválidos." });
+    }
+
+    const user = await this.profileService.updatePassword(
+      result.data.userId,
+      result.data.lastPassword,
+      result.data.newPassword,
+    );
+
+    return reply.status(200).send(user);
+  }
 }
 
-export { ProfileController }
+export { ProfileController };

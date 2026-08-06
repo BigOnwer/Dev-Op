@@ -5,18 +5,31 @@ cloudinary.config({
 });
 
 
-export async function UploadAvatar(image: string) {
-    const options = {
-      use_filename: true,
-      unique_filename: false,
-      overwrite: true,
-    };
+export async function UploadAvatar(
+  buffer: Buffer,
+  userId: string,
+  mimetype: string
+): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'avatars',
+          public_id: userId,
+          overwrite: true,
+          invalidate: true,
+          resource_type: 'image',
+          allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+          transformation: [
+            {width: 512, height: 512, crop: 'fill', gravity: 'face'},
+            {fetch_format: 'auto', quality: 'auto'},
+          ],
+        },
+        (error, result) => {
+          if (error || !result)  return reject(error)
+          resolve(result.secure_url)
+        }
+      )
 
-    try {
-      const result = await cloudinary.uploader.upload(image, options);
-      return result.secure_url;
-    } catch (error) {
-      console.error(error);
-      throw new Error("Failed to upload avatar");
-    }
+      stream.end(buffer)
+    })
 }

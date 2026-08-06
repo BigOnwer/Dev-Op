@@ -1,211 +1,143 @@
-import type { FastifyReply, FastifyRequest } from "fastify"
-import type { CompleteStepRequest, ProjectInterface, DetailsInterface } from "../types/project.js";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import {
+  completeStepSchema,
+  createNoteSchema,
+  createProjectSchema,
+  idParamsSchema,
+  projectChatSchema,
+  stepIdParamsSchema,
+  type CreateNoteInput,
+  type ProjectChatInput,
+} from "../schema/project.schema.js";
 import type { ProjectService } from "../services/projectService.js";
-import { completeStepSchema, createNoteSchema, createProjectSchema, idParamsSchema, projectChatSchema, stepIdParamsSchema, type CreateNoteInput, type ProjectChatInput,  } from "../schema/project.schema.js";
+import type { CompleteStepRequest, ProjectInterface } from "../types/project.js";
 
 class ProjectController {
-    constructor(private projectService: ProjectService) {}
+  constructor(private projectService: ProjectService) {}
 
-    async createProject(request: FastifyRequest<{Body: ProjectInterface}>, reply: FastifyReply) {
-        try {
-            const result = createProjectSchema.safeParse(request.body)
-            const userId = request.user?.sub
-
-            if (!result.success) {
-                return reply.status(400).send({ error: "Invalid project data" })
-            }
-
-            const { name, description, level, framework, language } = result.data
-
-            const project = await this.projectService.createProject(name, description, level, framework, language, userId)
-
-            return reply.status(201).send(project)
-        } catch (error) {
-            console.error("Error in createProject:", error)
-            return reply.status(500).send({ error: "Internal Server Error" })
-        }
+  async createProject(request: FastifyRequest<{ Body: ProjectInterface }>, reply: FastifyReply) {
+    const result = createProjectSchema.safeParse(request.body);
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "Dados do projeto inválidos." });
     }
 
-    async detailsChat(request: FastifyRequest<{Body: ProjectChatInput}>, reply: FastifyReply) {
-        const result = projectChatSchema.safeParse(request.body)
-        const userId = request.user?.sub
+    const { name, description, level, framework, language } = result.data;
+    const project = await this.projectService.createProject(
+      name,
+      description,
+      level,
+      framework,
+      language,
+      request.user.sub,
+    );
 
-        if(!result.success) {
-            return reply.status(400).send({ error: "Invalid project chat data" })
-        }
+    return reply.status(201).send(project);
+  }
 
-        const { projectId, message, stepId } = result.data
-
-        const chat = await this.projectService.detailsChat(projectId, message, stepId || null, userId)
-
-        return reply.status(200).send({
-            message: "resposta gerada com sucesso",
-            data: chat
-        })
+  async detailsChat(request: FastifyRequest<{ Body: ProjectChatInput }>, reply: FastifyReply) {
+    const result = projectChatSchema.safeParse(request.body);
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "Dados do chat inválidos." });
     }
 
-    async completeStep(
-        request: FastifyRequest<CompleteStepRequest>, 
-        reply: FastifyReply
-    ) {
-        try{
-            const params = stepIdParamsSchema.safeParse(request.params);
-            const result = completeStepSchema.safeParse(request.body);
-            const userId = request.user?.sub;
+    const { projectId, message, stepId } = result.data;
+    const chat = await this.projectService.detailsChat(projectId, message, stepId ?? null, request.user.sub);
 
-            if(!result.success) {
-                return reply.status(400).send({error: 'Invalid step data'})
-            }
+    return reply.status(200).send({
+      message: "Resposta gerada com sucesso",
+      data: chat,
+    });
+  }
 
-            if(!params.success) {
-                return reply.status(400).send({error: 'Invalid step ID'})
-            }
+  async completeStep(request: FastifyRequest<CompleteStepRequest>, reply: FastifyReply) {
+    const params = stepIdParamsSchema.safeParse(request.params);
+    const body = completeStepSchema.safeParse(request.body);
 
-            const { state } = result.data;
-            const { stepId } = params.data;
-
-            const updatedStep = await this.projectService.completeStep(state, stepId, userId);
-            return reply.status(200).send({
-                message: "Passo atualizado com sucesso!",
-                data: updatedStep
-            });
-        } catch (error) {
-            if (error instanceof Error) {
-                if (error.message === "This step not exist") {
-                return reply.status(404).send({ error: error.message });
-                }
-                return reply.status(400).send({ error: error.message });
-            }
-
-            return reply.status(500).send({ error: "Erro interno do servidor." });
-        }
+    if (!params.success || !body.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "Dados da etapa inválidos." });
     }
 
-    async createNote(request: FastifyRequest<{Body: CreateNoteInput}>, reply: FastifyReply) {
-        try {
-            const result = createNoteSchema.safeParse(request.body)
-            if (!result.success) {
-                return reply.status(400).send({ error: "Invalid note data" })
-            }
+    const updatedStep = await this.projectService.completeStep(
+      body.data.state,
+      params.data.stepId,
+      request.user.sub,
+    );
 
-            const { projectId, note, stepId } = result.data
-            const userId = request.user?.sub
-            const createdNote = await this.projectService.createNote(projectId, note, userId, stepId)
+    return reply.status(200).send({
+      message: "Passo atualizado com sucesso!",
+      data: updatedStep,
+    });
+  }
 
-            return reply.status(201).send({
-                message: "Note created successfully",
-                data: createdNote
-            })
-        } catch (error) {
-            console.log("Error in createNote:", error)
-            return reply.status(500).send({ error: "Internal Server Error" });
-        }
+  async createNote(request: FastifyRequest<{ Body: CreateNoteInput }>, reply: FastifyReply) {
+    const result = createNoteSchema.safeParse(request.body);
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "Dados da nota inválidos." });
     }
 
-    async deleteNote(request: FastifyRequest<{Params: {id: string, userId: string}}>, reply: FastifyReply) {
-        try {
-            const response = idParamsSchema.safeParse(request.params)
-            const userId = request.user?.sub
+    const { projectId, note, stepId } = result.data;
+    const createdNote = await this.projectService.createNote(projectId, note, request.user.sub, stepId);
 
-            if(!response.success) {
-                return reply.status(400).send({ error: "Note ID is required" })
-            }
+    return reply.status(201).send({
+      message: "Nota criada com sucesso",
+      data: createdNote,
+    });
+  }
 
-            const noteId = response.data.id
-
-            await this.projectService.deleteNote(noteId, userId)
-
-            return reply.status(200).send({ message: "Note deleted successfully" })
-        } catch (error) {
-            console.error("Error in deleteNote:", error)
-            return reply.status(500).send({ error: "Internal Server Error" })
-        }
+  async deleteNote(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const result = idParamsSchema.safeParse(request.params);
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "ID da nota inválido." });
     }
 
-    async getNoteById(request: FastifyRequest<{Params: {id: string, userId: string}}>, reply: FastifyReply) {
-        try {
-            const userId = request.user?.sub
-            if(!userId) {
-                return reply.status(400).send({ error: "User ID is required" })
-            }
+    await this.projectService.deleteNote(result.data.id, request.user.sub);
+    return reply.status(200).send({ message: "Nota excluída com sucesso" });
+  }
 
-            const response = idParamsSchema.safeParse(request.params)
-
-            if(!response.success) {
-                return reply.status(400).send({ error: "Note ID is required" })
-            }
-
-            const noteId = response.data.id
-
-            const note = await this.projectService.getNoteById(noteId, userId)
-
-            return reply.status(200).send(note)
-        } catch (error) {
-            console.error("Error in getNoteById:", error)
-            return reply.status(500).send({ error: "Internal Server Error" })
-        }
+  async getNoteById(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const result = idParamsSchema.safeParse(request.params);
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "ID da nota inválido." });
     }
 
-    async getAllNotesByProjectId(request: FastifyRequest<{Params: {id: string}}>, reply: FastifyReply) {
-        try {
-            const response = idParamsSchema.safeParse(request.params)
-            if(!response.success) {
-                return reply.status(400).send({ error: "Project ID is required" })
-            }
+    const note = await this.projectService.getNoteById(result.data.id, request.user.sub);
+    return reply.status(200).send(note);
+  }
 
-            const projectId = response.data.id
-            const notes = await this.projectService.getAllNotesByProjectId(projectId, request.user?.sub)
-            return reply.status(200).send(notes)
-        } catch (error) {
-            console.error("Error in getAllNotesByProjectId:", error)
-            return reply.status(500).send({ error: "Internal Server Error" })
-        }
+  async getAllNotesByProjectId(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const result = idParamsSchema.safeParse(request.params);
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "ID do projeto inválido." });
     }
 
-    async getAllNotesByStepId(request: FastifyRequest<{Params: {id: string}}>, reply: FastifyReply) {
-        try {
-            const response = idParamsSchema.safeParse(request.params)
-            if(!response.success) {
-                return reply.status(400).send({ error: "Step ID is required" })
-            }
+    const notes = await this.projectService.getAllNotesByProjectId(result.data.id, request.user.sub);
+    return reply.status(200).send(notes);
+  }
 
-            const stepId = response.data.id
-            const notes = await this.projectService.getAllNotesByStepId(stepId, request.user?.sub)
-            return reply.status(200).send(notes)
-        } catch (error) {
-            console.error("Error in getAllNotesByStepId:", error)
-            return reply.status(500).send({ error: "Internal Server Error" })
-        }
+  async getAllNotesByStepId(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const result = idParamsSchema.safeParse(request.params);
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "ID da etapa inválido." });
     }
 
-    
+    const notes = await this.projectService.getAllNotesByStepId(result.data.id, request.user.sub);
+    return reply.status(200).send(notes);
+  }
 
-    async getAllProjectsByUserId(request: FastifyRequest, reply: FastifyReply) {
-        try {
-            const userId = request.user?.sub
-            const projects = await this.projectService.getAllProjectsByUserId(userId)
-            return reply.status(200).send(projects)
-        } catch (error) {
-            console.error("Error in getAllProjectsByUserId:", error)
-            return reply.status(500).send({ error: "Internal Server Error" })
-        }
+  async getAllProjectsByUserId(request: FastifyRequest, reply: FastifyReply) {
+    const projects = await this.projectService.getAllProjectsByUserId(request.user.sub);
+    return reply.status(200).send(projects);
+  }
+
+  async getProjectById(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    const result = idParamsSchema.safeParse(request.params);
+    if (!result.success) {
+      return reply.status(400).send({ error: "VALIDATION_ERROR", message: "ID do projeto inválido." });
     }
 
-    async getProjectById(request: FastifyRequest<{Params: {id: string}}>, reply: FastifyReply) {
-        try {
-            const userId = request.user?.sub
-            const response = idParamsSchema.safeParse(request.params)
-            if(!response.success) {
-                return reply.status(400).send({ error: "Project ID is required" })
-            }
-            const projectId = response.data.id
-            const project = await this.projectService.getProjectById(projectId, userId)
-            return reply.status(200).send(project)
-        } catch (error) {
-            console.error("Error in getProjectById:", error)
-            return reply.status(500).send({ error: "Internal Server Error" })
-        }
-    }
+    const project = await this.projectService.getProjectById(result.data.id, request.user.sub);
+    return reply.status(200).send(project);
+  }
 }
 
-export { ProjectController }
+export { ProjectController };

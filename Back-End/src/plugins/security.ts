@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import helmet from "@fastify/helmet";
 import rateLimit from '@fastify/rate-limit'
 import cors from "@fastify/cors";
+import multipart from '@fastify/multipart';
 import { env } from "../config/env.js";
 
 export async function registerSecurity(app: FastifyInstance) {
@@ -57,4 +58,13 @@ export async function CorsConfig(app: FastifyInstance) {
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     });
+}
+
+export async function limitRequest(app: FastifyInstance) {
+    await app.register(multipart, {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1
+      }
+    })
 }

@@ -1,13 +1,14 @@
 import { prisma } from "../lib/prisma.js"
 import { Framework, Language, Level } from '../generated/prisma/enums.js';
 import { AIService } from "../lib/ai.js";
+import { ForbiddenError, NotFoundError, UnauthorizedError } from "../errors/app-errors.js";
 
 class ProjectService {
     constructor(private aiService: AIService) {}
     
     async createProject(name: string, description: string, level: Level, framework: Framework, language: Language, userId: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
         console.log("1 - Criando projeto")
         const createProject = await prisma.project.create({
@@ -69,7 +70,7 @@ class ProjectService {
 
     async detailsChat(projectId: string, message: string, stepId: string | null, userId: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
 
         console.log("1 - Buscando projeto")
@@ -80,11 +81,11 @@ class ProjectService {
         })
         
         if(!project) {
-            throw new Error("project not existing")
+            throw new NotFoundError("Projeto não encontrado")
         }
 
         if(project.userId !== userId) {
-            throw new Error("User not authorized to access this project")
+            throw new ForbiddenError("Você não pode acessar este projeto")
         }
          console.log("2 - Projeto encontrado")
 
@@ -102,12 +103,12 @@ class ProjectService {
             })
 
             if (!step) {
-                throw new Error("Step not found")
+                throw new NotFoundError("Etapa não encontrada")
             }
 
 
             if (step.projectId !== projectId) {
-                throw new Error("Step does not belong to this project")
+                throw new ForbiddenError("Esta etapa não pertence ao projeto")
             }
 
             context = {
@@ -132,7 +133,7 @@ class ProjectService {
 
     async completeStep(state: boolean, stepId: string, userId: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
         const step = await prisma.roadmapStep.findUnique({
             where: {
@@ -149,11 +150,11 @@ class ProjectService {
         })
 
         if(!step) {
-            throw new Error("This step not exist")
+            throw new NotFoundError("Etapa não encontrada")
         }
 
         if(step.project.userId !== userId) {
-            throw new Error("User not authorized to access this step")
+            throw new ForbiddenError("Você não pode alterar esta etapa")
         }
 
         const newState = !state
@@ -172,7 +173,7 @@ class ProjectService {
 
     async createNote(projectId: string, note: string, userId: string, stepId?: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
 
         const project = await prisma.project.findFirst({
@@ -183,11 +184,11 @@ class ProjectService {
         })
 
         if(!project) {
-            throw new Error("Project not existing")
+            throw new NotFoundError("Projeto não encontrado")
         }
 
         if(project.userId !== userId) {
-            throw new Error("User not authorized to access this project")
+            throw new ForbiddenError("Você não pode acessar este projeto")
         }
 
         if(stepId) {
@@ -198,11 +199,11 @@ class ProjectService {
             })
 
             if(!step) {
-                throw new Error("Step not existing")
+                throw new NotFoundError("Etapa não encontrada")
             }
 
             if(step.projectId !== projectId) {
-                throw new Error("Step does not belong to this project")
+                throw new ForbiddenError("Esta etapa não pertence ao projeto")
             }
         }
 
@@ -217,7 +218,7 @@ class ProjectService {
 
     async deleteNote(noteId: string, userId: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
 
         const note = await prisma.note.findUnique({
@@ -246,11 +247,11 @@ class ProjectService {
         })
 
         if(project?.project?.userId !== userId) {
-            throw new Error("User not authorized to access this note")
+            throw new ForbiddenError("Você não pode acessar esta nota")
         }
 
         if (!note) {
-            throw new Error("Note not existing")
+            throw new NotFoundError("Nota não encontrada")
         }
         
         const deleteNote = await prisma.note.deleteMany({
@@ -264,7 +265,7 @@ class ProjectService {
 
     async getNoteById(noteId: string, userId: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
 
         const project = await prisma.note.findUnique({
@@ -284,11 +285,11 @@ class ProjectService {
         })
 
         if(project?.project?.userId !== userId) {
-            throw new Error("User not authorized to access this note")
+            throw new ForbiddenError("Você não pode acessar esta nota")
         }
 
         if(project.project.userId !== userId) {
-            throw new Error("User not authorized to access this note")
+            throw new ForbiddenError("Você não pode acessar esta nota")
         }
 
         const note = await prisma.note.findUnique({
@@ -302,7 +303,7 @@ class ProjectService {
 
     async getAllNotesByProjectId(projectId: string, userId: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
 
         const project = await prisma.project.findFirst({
@@ -310,11 +311,11 @@ class ProjectService {
         })
 
         if (!project) {
-            throw new Error("Project not existing")
+            throw new NotFoundError("Projeto não encontrado")
         }
 
         if(project.userId !== userId) {
-            throw new Error("User not authorized to access this project")
+            throw new ForbiddenError("Você não pode acessar este projeto")
         }
 
         const notes = await prisma.note.findMany({
@@ -328,7 +329,7 @@ class ProjectService {
 
     async getAllNotesByStepId(stepId: string, userId: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
 
         const step = await prisma.roadmapStep.findFirst({
@@ -352,11 +353,11 @@ class ProjectService {
         })
 
         if(project?.project?.userId !== userId) {
-            throw new Error("User not authorized to access this step")
+            throw new ForbiddenError("Você não pode acessar esta etapa")
         }
 
         if (!step) {
-            throw new Error("Step not existing")
+            throw new NotFoundError("Etapa não encontrada")
         }
 
         const notes = await prisma.note.findMany({
@@ -370,7 +371,7 @@ class ProjectService {
 
     async getAllProjectsByUserId(userId: string) {
         if(!userId) {
-            throw new Error("User not authenticated")
+            throw new UnauthorizedError()
         }
 
         const projects = await prisma.project.findMany({
@@ -394,17 +395,12 @@ class ProjectService {
             }
         })
 
-        if (project?.userId !== userId) {
-            throw new Error(`User with ID ${userId} is not authorized to access project with ID ${projectId}`);
+        if (!project) {
+            throw new NotFoundError("Projeto não encontrado")
         }
 
-        console.log({
-            projectUserId: project?.userId,
-            requestUserId: userId
-        })
-
-        if (!project) {
-            throw new Error(`Project with ID ${projectId} not found`);
+        if (project.userId !== userId) {
+            throw new ForbiddenError("Você não pode acessar este projeto")
         }
 
         return project

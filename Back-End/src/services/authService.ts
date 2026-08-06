@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt'
 import { prisma } from "../lib/prisma.js"
 import { serializeUser } from '../serializers/user.serializer.js'
+import { ConflictError, UnauthorizedError } from "../errors/app-errors.js"
 
 class AuthService {
     async register(name: string, email: string, password: string) {
@@ -8,13 +9,23 @@ class AuthService {
 
         const hashedPassword = await bcrypt.hash(password, 10)
 
-        const createUser = await prisma.user.create({
-            data: {
-                name,
-                email,
-                password: hashedPassword,
-            },
-        })
+        let createUser
+
+        try {
+            createUser = await prisma.user.create({
+                data: {
+                    name,
+                    email,
+                    password: hashedPassword,
+                },
+            })
+        } catch (error) {
+            if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+                throw new ConflictError("Este e-mail já está cadastrado")
+            }
+
+            throw error
+        }
 
         return serializeUser(createUser);
     }
@@ -25,13 +36,13 @@ class AuthService {
         })
 
         if (!user) {
-            throw new Error("User not found")
+            throw new UnauthorizedError("E-mail ou senha inválidos")
         }
 
         const isMatch = await bcrypt.compare(password, user.password)
 
         if (!isMatch) {
-            throw new Error("Invalid password")
+            throw new UnauthorizedError("E-mail ou senha inválidos")
         }
 
         return user

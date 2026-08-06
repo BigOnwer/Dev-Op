@@ -24,7 +24,7 @@ export function WorkspacePage({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     api.getProject(projectId).then(setProject).catch((caught) => {
-      if (caught instanceof ApiError && [401, 403, 500].includes(caught.status)) router.replace("/login");
+      if (caught instanceof ApiError && caught.status === 401) router.replace("/login");
       else setError(caught instanceof ApiError ? caught.message : "Não foi possível carregar este projeto.");
     });
   }, [projectId, router]);

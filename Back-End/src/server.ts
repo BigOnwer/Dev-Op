@@ -5,13 +5,27 @@ import jwt from "@fastify/jwt"
 import { ProjectRoute } from './routes/project.js'
 import { ProfileRoute } from './routes/profile.js'
 import { env } from './config/env.js'
-import { CorsConfig, RateRequestLimit, registerSecurity } from './plugins/security.js'
+import { CorsConfig, limitRequest, RateRequestLimit, registerSecurity } from './plugins/security.js'
+import { registerErrorHandler } from './plugins/error-handler.js'
 
-const server = fastify()
+const server = fastify({
+  logger: {
+    level: env.NODE_ENV === "production" ? "info" : "debug",
+    redact: [
+      "req.headers.authorization",
+      "req.headers.cookie",
+      "req.body.password",
+      "req.body.lastPassword",
+      "req.body.newPassword",
+    ],
+  },
+})
 
 await registerSecurity(server)
 await RateRequestLimit(server)
 await CorsConfig(server)
+await limitRequest(server)
+registerErrorHandler(server)
 
 await server.register(cookie)
 await server.register(jwt, {

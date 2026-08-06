@@ -1,6 +1,8 @@
 import { prisma } from "../lib/prisma.js"
 import bcrypt from 'bcrypt'
 import { UploadAvatar } from "../lib/uploadAvatar.js";
+import { serializeUser } from "../serializers/user.serializer.js";
+import { NotFoundError, UnauthorizedError } from "../errors/app-errors.js";
 
 class ProfileService {
     async getUser(userId: string) {
@@ -16,7 +18,10 @@ class ProfileService {
                 avatar: true,
             }
         })
-        return user;
+        if (!user) {
+            throw new NotFoundError("Usuário não encontrado")
+        }
+        return user
     }
 
     async updateUser(userId: string, name: string) {
@@ -26,7 +31,7 @@ class ProfileService {
             }
         })
         if (!user) {
-            throw new Error("User not found")
+            throw new NotFoundError("Usuário não encontrado")
         }
 
         const updateUser = await prisma.user.update({
@@ -38,7 +43,7 @@ class ProfileService {
             }
         })
 
-        return updateUser
+        return serializeUser(updateUser)
     }
 
     async updatePassword(userId: string, lastPassword: string, newPassword: string) {
@@ -48,16 +53,16 @@ class ProfileService {
             }
         })
         if (!user) {
-            throw new Error("User not found")
+            throw new NotFoundError("Usuário não encontrado")
         }
 
         if(!userId) {
-            throw new Error("User ID is required")
+            throw new UnauthorizedError()
         }
 
         const isMatch = await bcrypt.compare(lastPassword, user?.password)
         if(!isMatch) {
-            throw new Error("As senhas nao sao iguais")
+            throw new UnauthorizedError("Senha atual inválida")
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10)
@@ -71,38 +76,35 @@ class ProfileService {
             }
         })
 
-        return updatePassword
+        return serializeUser(updatePassword)
     }
 
-    async uploadAvatar(userId: string, imagePatch: string) {
+    async uploadAvatar(userId: string, buffer: Buffer, mimetype: string) {
         const user = await prisma.user.findUnique({
             where: {
                 id: userId
             }
         })
         if (!user) {
-            throw new Error("User not found")
+            throw new NotFoundError("Usuário não encontrado")
         }
 
         if(!userId) {
-            throw new Error("User ID is required")
+            throw new UnauthorizedError()
         }
 
-        const uploadAvatar = await UploadAvatar(imagePatch)
-        if (!uploadAvatar) {
-            throw new Error("Error uploading avatar")
-        }
+        const avatarUrl = await UploadAvatar(buffer, userId, mimetype);
 
         const updateAvatar = await prisma.user.update({
             where: {
                 id: userId
             },
             data: {
-                avatar: uploadAvatar
+                avatar: avatarUrl
             }
         })
 
-        return updateAvatar
+        return serializeUser(updateAvatar)
     }
 }
 

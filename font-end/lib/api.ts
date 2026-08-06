@@ -18,7 +18,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers,
   });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new ApiError(body?.error ?? "Não foi possível concluir a solicitação.", response.status);
+  if (!response.ok) {
+    throw new ApiError(
+      body?.message ?? body?.error ?? "Não foi possível concluir a solicitação.",
+      response.status,
+    );
+  }
   return body as T;
 }
 
@@ -46,5 +51,13 @@ export const api = {
   deleteNote: (noteId: string) => request<{ message: string }>(`/projects/note/${noteId}`, { method: "DELETE" }),
   updateUser: (name: string) => request<User>("/update-user", { method: "POST", body: JSON.stringify({ name }) }),
   updatePassword: (input: { lastPassword: string; newPassword: string }) => request<User>("/update-password", { method: "POST", body: JSON.stringify(input) }),
-  uploadAvatar: (imagePatch: string) => request<User>("/upload-avatar", { method: "POST", body: JSON.stringify({ imagePatch }) }),
+  uploadAvatar: (file: File) => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    return request<User>("/upload-avatar", {
+      method: "POST",
+      body: formData,
+    });
+  },
 };
